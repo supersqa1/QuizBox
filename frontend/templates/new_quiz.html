@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}New Quiz - QuizBox{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-center">Create New Quiz</h3>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+                
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="question_text" class="form-label">Question</label>
+                        <textarea class="form-control" id="question_text" name="question_text" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="answer_text" class="form-label">Answer</label>
+                        <textarea class="form-control" id="answer_text" name="answer_text" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="theme_id" class="form-label">Theme (optional)</label>
+                        <select class="form-select" id="theme_id" name="theme_id">
+                            <option value="">Select a theme</option>
+                            {% for theme in themes %}
+                            <option value="{{ theme.id }}">{{ theme.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Create Quiz</button>
+                        <a href="/dashboard" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

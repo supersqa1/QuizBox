@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Initial Setup - QuizBox{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-center">Initial Setup</h3>
+            </div>
+            <div class="card-body">
+                <p class="text-center mb-4">Welcome to QuizBox! Let's create your admin account.</p>
+                <form id="setupForm">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Admin Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Create Admin Account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    document.getElementById('setupForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const formData = {
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value
+        };
+        
+        try {
+            const response = await fetch('/setup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            if (response.ok) {
+                window.location.href = '/dashboard';
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Setup failed');
+            }
+        } catch (error) {
+            alert('An error occurred during setup');
+        }
+    });
+</script>
+{% endblock %}
+{% endblock %} 

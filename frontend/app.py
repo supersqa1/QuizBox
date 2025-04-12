@@ -129,14 +129,14 @@ def dashboard():
         
         # Get user's quizzes
         quizzes_response = requests.get(
-            f'{BACKEND_URL}/quiz/mine',
+            f'{BACKEND_URL}/quizzes',  # Updated endpoint
             headers={'x-api-key': api_key},
             cookies={'session': session.get('user_id')}
         )
         quizzes = quizzes_response.json() if quizzes_response.status_code == 200 else []
         
         # Get default quizzes
-        default_response = requests.get(f'{BACKEND_URL}/quiz/default')
+        default_response = requests.get(f'{BACKEND_URL}/quizzes/default')
         default_quizzes = default_response.json() if default_response.status_code == 200 else []
         
         return render_template('dashboard.html', quizzes=quizzes, default_quizzes=default_quizzes)
@@ -169,39 +169,44 @@ def new_quiz():
             api_key = api_key_response.json()['api_key']
             
             # Create quiz
-            quiz_data = {
-                'question_text': request.form['question_text'],
-                'answer_text': request.form['answer_text'],
-                'theme_id': request.form.get('theme_id') or None
-            }
+            quiz_data = request.get_json()  # Get JSON data instead of form data
             
             response = requests.post(
-                f'{BACKEND_URL}/quiz',
+                f'{BACKEND_URL}/quizzes',  # Updated endpoint
                 json=quiz_data,
-                headers={'x-api-key': api_key},
+                headers={
+                    'x-api-key': api_key,
+                    'Content-Type': 'application/json'
+                },
                 cookies={'session': session.get('user_id')}
             )
             
             if response.status_code == 201:
                 return redirect(url_for('dashboard'))
-            logger.error(f"Failed to create quiz: {response.text}")
-            return render_template('new_quiz.html', error='Failed to create quiz')
+            
+            error_msg = response.json().get('error', 'Failed to create quiz')
+            logger.error(f"Failed to create quiz: {error_msg}")
+            return jsonify({'error': error_msg}), response.status_code
+            
         except Exception as e:
             logger.error("Error creating quiz", exc_info=True)
-            return render_template('new_quiz.html', error=str(e))
+            return jsonify({'error': str(e)}), 500
     
     # GET request - show form
     try:
         # Get themes
-        themes_response = requests.get(
-            f'{BACKEND_URL}/themes'
-        )
+        logger.info("Fetching themes from backend...")
+        themes_response = requests.get(f'{BACKEND_URL}/themes')
+        logger.info(f"Themes response status: {themes_response.status_code}")
+        logger.info(f"Themes response content: {themes_response.text}")
+        
         if themes_response.status_code == 200:
-            themes = themes_response.json().get('themes', [])
+            themes = themes_response.json()  # Themes array is returned directly now
+            logger.info(f"Retrieved themes: {themes}")
+            return render_template('new_quiz.html', themes=themes)
         else:
-            themes = []
             logger.error(f"Failed to get themes: {themes_response.text}")
-        return render_template('new_quiz.html', themes=themes)
+            return render_template('new_quiz.html', themes=[], error='Failed to load themes')
     except Exception as e:
         logger.error("Error getting themes", exc_info=True)
         return render_template('new_quiz.html', themes=[], error=str(e))

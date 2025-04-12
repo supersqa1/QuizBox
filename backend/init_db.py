@@ -1,21 +1,48 @@
 import pymysql
 import os
+import time
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Database configuration
 DB_CONFIG = {
     'host': os.environ.get('DB_HOST', 'mysql'),
     'user': os.environ.get('DB_USER', 'root'),
     'password': os.environ.get('DB_PASSWORD', 'password'),
+    'port': int(os.environ.get('DB_PORT', 3306)),
     'charset': 'utf8mb4',
     'cursorclass': pymysql.cursors.DictCursor
 }
 
+def wait_for_mysql(max_retries=30, delay=1):
+    """Wait for MySQL to be ready"""
+    for i in range(max_retries):
+        try:
+            conn = pymysql.connect(**DB_CONFIG)
+            conn.close()
+            print("MySQL is ready!")
+            return True
+        except pymysql.err.OperationalError as e:
+            if i == max_retries - 1:
+                print(f"Failed to connect to MySQL after {max_retries} attempts")
+                raise e
+            print(f"Waiting for MySQL... (attempt {i+1}/{max_retries})")
+            time.sleep(delay)
+    return False
+
 def init_db():
-    """Initialize the database with required tables"""
-    # First create the database if it doesn't exist
+    """Initialize the database"""
+    # Wait for MySQL to be ready
+    wait_for_mysql()
+    
+    # Connect to MySQL server
     conn = pymysql.connect(**DB_CONFIG)
+    
     try:
         with conn.cursor() as cursor:
+            # Create database if it doesn't exist
             cursor.execute("CREATE DATABASE IF NOT EXISTS quizbox")
             cursor.execute("USE quizbox")
             
@@ -28,17 +55,6 @@ def init_db():
                     password_hash VARCHAR(255) NOT NULL,
                     is_admin BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Create api_keys table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS api_keys (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    user_id INT NOT NULL,
-                    api_key VARCHAR(255) NOT NULL UNIQUE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(id)
                 )
             """)
             
@@ -57,9 +73,9 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS quizzes (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     user_id INT NOT NULL,
+                    quiz_type VARCHAR(50) NOT NULL,
                     question_text TEXT NOT NULL,
-                    answer_text TEXT NOT NULL,
-                    structure JSON,
+                    answer_text TEXT,
                     theme_id INT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id),
@@ -67,26 +83,23 @@ def init_db():
                 )
             """)
             
-            # Insert default themes
-            cursor.execute("SELECT COUNT(*) FROM themes")
-            if cursor.fetchone()['COUNT(*)'] == 0:
-                default_themes = [
-                    ('Python Basics', 'Basic Python concepts and syntax'),
-                    ('Data Structures', 'Python data structures and their usage'),
-                    ('Functions', 'Function definitions and usage'),
-                    ('Object-Oriented Programming', 'Classes and objects in Python'),
-                    ('Error Handling', 'Exception handling and debugging'),
-                    ('File Operations', 'Working with files in Python'),
-                    ('Modules and Packages', 'Importing and using Python modules'),
-                    ('Web Development', 'Python web frameworks and concepts')
-                ]
-                cursor.executemany(
-                    "INSERT INTO themes (name, description) VALUES (%s, %s)",
-                    default_themes
+            # Create api_keys table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS api_keys (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    api_key VARCHAR(255) NOT NULL UNIQUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
                 )
+            """)
             
             conn.commit()
             print("Database initialized successfully!")
+            
+    except Exception as e:
+        print(f"Error initializing database: {str(e)}")
+        raise
     finally:
         conn.close()
 

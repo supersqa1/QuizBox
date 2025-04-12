@@ -38,15 +38,40 @@
                                 </button>
                                 <div class="feedback mt-2" style="display: none;"></div>
                             {% else %}
-                                <div class="answer-input">
-                                    <input type="text" class="form-control" placeholder="Your answer">
-                                    <button class="btn btn-sm btn-primary mt-2 check-answer" 
-                                            data-quiz-id="{{ quiz.id }}"
-                                            data-correct="{{ quiz.answer_text }}">
-                                        Check Answer
-                                    </button>
-                                    <div class="feedback mt-2" style="display: none;"></div>
-                                </div>
+                                {% if quiz.quiz_type == 'text' %}
+                                    <div class="answer-input">
+                                        <input type="text" class="form-control" placeholder="Your answer">
+                                        <button class="btn btn-sm btn-primary mt-2 check-answer" 
+                                                data-quiz-id="{{ quiz.id }}"
+                                                data-correct="{{ quiz.answer_text }}">
+                                            Check Answer
+                                        </button>
+                                        <div class="feedback mt-2" style="display: none;"></div>
+                                    </div>
+                                {% elif quiz.quiz_type == 'true_false' %}
+                                    <div class="true-false-options">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" 
+                                                   name="quiz-{{ quiz.id }}-option" 
+                                                   value="true"
+                                                   id="true-{{ quiz.id }}">
+                                            <label class="form-check-label" for="true-{{ quiz.id }}">True</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" 
+                                                   name="quiz-{{ quiz.id }}-option" 
+                                                   value="false"
+                                                   id="false-{{ quiz.id }}">
+                                            <label class="form-check-label" for="false-{{ quiz.id }}">False</label>
+                                        </div>
+                                        <button class="btn btn-sm btn-primary mt-2 check-answer" 
+                                                data-quiz-id="{{ quiz.id }}"
+                                                data-correct="{{ quiz.answer_text }}">
+                                            Check Answer
+                                        </button>
+                                        <div class="feedback mt-2" style="display: none;"></div>
+                                    </div>
+                                {% endif %}
                             {% endif %}
                             <small class="text-muted">Theme: {{ quiz.theme_name or 'None' }}</small>
                         </div>
@@ -86,15 +111,40 @@
                                 </button>
                                 <div class="feedback mt-2" style="display: none;"></div>
                             {% else %}
-                                <div class="answer-input">
-                                    <input type="text" class="form-control" placeholder="Your answer">
-                                    <button class="btn btn-sm btn-primary mt-2 check-answer" 
-                                            data-quiz-id="{{ quiz.id }}"
-                                            data-correct="{{ quiz.answer_text }}">
-                                        Check Answer
-                                    </button>
-                                    <div class="feedback mt-2" style="display: none;"></div>
-                                </div>
+                                {% if quiz.quiz_type == 'text' %}
+                                    <div class="answer-input">
+                                        <input type="text" class="form-control" placeholder="Your answer">
+                                        <button class="btn btn-sm btn-primary mt-2 check-answer" 
+                                                data-quiz-id="{{ quiz.id }}"
+                                                data-correct="{{ quiz.answer_text }}">
+                                            Check Answer
+                                        </button>
+                                        <div class="feedback mt-2" style="display: none;"></div>
+                                    </div>
+                                {% elif quiz.quiz_type == 'true_false' %}
+                                    <div class="true-false-options">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" 
+                                                   name="quiz-{{ quiz.id }}-option" 
+                                                   value="true"
+                                                   id="true-{{ quiz.id }}">
+                                            <label class="form-check-label" for="true-{{ quiz.id }}">True</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" 
+                                                   name="quiz-{{ quiz.id }}-option" 
+                                                   value="false"
+                                                   id="false-{{ quiz.id }}">
+                                            <label class="form-check-label" for="false-{{ quiz.id }}">False</label>
+                                        </div>
+                                        <button class="btn btn-sm btn-primary mt-2 check-answer" 
+                                                data-quiz-id="{{ quiz.id }}"
+                                                data-correct="{{ quiz.answer_text }}">
+                                            Check Answer
+                                        </button>
+                                        <div class="feedback mt-2" style="display: none;"></div>
+                                    </div>
+                                {% endif %}
                             {% endif %}
                             <small class="text-muted">Created by {{ quiz.created_by or 'Admin' }}</small>
                             <br>
@@ -163,15 +213,29 @@ document.addEventListener('DOMContentLoaded', function() {
                     message = isCorrect ? 'Correct!' : `Incorrect. The correct answer is: ${correctAnswers.join(' or ')}`;
                 }
             } else {
-                // Text answer quiz
-                const userAnswer = quizContainer.querySelector('input[type="text"]').value.trim().toLowerCase();
-                const correctAnswer = this.dataset.correct.toLowerCase();
+                // Text or True/False quiz
+                const quizType = quizContainer.querySelector('.true-false-options') ? 'true_false' : 'text';
                 
-                if (!userAnswer) {
-                    message = 'Please enter an answer.';
+                if (quizType === 'true_false') {
+                    const selectedOption = quizContainer.querySelector('input[type="radio"]:checked');
+                    if (!selectedOption) {
+                        message = 'Please select an answer.';
+                    } else {
+                        const correctAnswer = this.dataset.correct.toLowerCase();
+                        isCorrect = selectedOption.value.toLowerCase() === correctAnswer;
+                        message = isCorrect ? 'Correct!' : `Incorrect. The correct answer is: ${correctAnswer}`;
+                    }
                 } else {
-                    isCorrect = userAnswer === correctAnswer;
-                    message = isCorrect ? 'Correct!' : `Incorrect. The correct answer is: ${this.dataset.correct}`;
+                    // Text answer quiz
+                    const userAnswer = quizContainer.querySelector('input[type="text"]').value.trim().toLowerCase();
+                    const correctAnswer = this.dataset.correct.toLowerCase();
+                    
+                    if (!userAnswer) {
+                        message = 'Please enter an answer.';
+                    } else {
+                        isCorrect = userAnswer === correctAnswer;
+                        message = isCorrect ? 'Correct!' : `Incorrect. The correct answer is: ${this.dataset.correct}`;
+                    }
                 }
             }
             

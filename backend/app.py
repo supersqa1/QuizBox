@@ -328,7 +328,7 @@ def create_quiz():
                 return jsonify({'error': f'Missing required field: {field}'}), 400
                 
         # Validate quiz type
-        if data['quiz_type'] not in ['text', 'multiple_choice']:
+        if data['quiz_type'] not in ['text', 'multiple_choice', 'true_false']:
             return jsonify({'error': 'Invalid quiz type'}), 400
             
         # For multiple choice quizzes, validate answer_text format

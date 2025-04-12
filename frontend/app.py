@@ -102,8 +102,20 @@ def register():
                     session['user_id'] = session_cookie
                     logger.debug(f"User registered with session: {session_cookie}")
                     return jsonify({'message': 'Registration successful'}), 201
+                else:
+                    # If no session cookie, try to login to get one
+                    login_response = requests.post(f'{BACKEND_URL}/login', json={
+                        'email': data['email'],
+                        'password': data['password']
+                    })
+                    if login_response.status_code == 200:
+                        session_cookie = login_response.cookies.get('session')
+                        if session_cookie:
+                            session['user_id'] = session_cookie
+                            return jsonify({'message': 'Registration successful'}), 201
             logger.error(f"Registration failed with response: {response.text}")
-            return jsonify({'error': 'Registration failed'}), 400
+            error_data = response.json()
+            return jsonify({'error': error_data.get('error', 'Registration failed')}), response.status_code
         except Exception as e:
             logger.error("Registration error", exc_info=True)
             return jsonify({'error': str(e)}), 500

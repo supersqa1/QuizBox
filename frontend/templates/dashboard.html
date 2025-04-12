@@ -3,52 +3,247 @@
 {% block title %}Dashboard - QuizBox{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h4>My Quizzes</h4>
-                <a href="/quiz/new" class="btn btn-primary btn-sm">New Quiz</a>
-            </div>
-            <div class="card-body">
-                {% if quizzes %}
-                    <div class="list-group">
+<div class="container mt-4">
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">My Quizzes</h5>
+                    <a href="{{ url_for('new_quiz') }}" class="btn btn-primary">New Quiz</a>
+                </div>
+                <div class="card-body">
+                    {% if quizzes %}
                         {% for quiz in quizzes %}
-                        <div class="list-group-item">
-                            <h5 class="mb-1">{{ quiz.question_text }}</h5>
-                            <p class="mb-1">{{ quiz.answer_text }}</p>
-                            <small class="text-muted">Created on {{ quiz.created_at }}</small>
+                        <div class="quiz-item mb-3" id="quiz-{{ quiz.id }}">
+                            <h6>{{ quiz.question_text }}</h6>
+                            {% if quiz.quiz_type == 'multiple_choice' %}
+                                <div class="options">
+                                    {% for option in quiz.answer_text.options %}
+                                        <div class="form-check">
+                                            <input class="form-check-input quiz-option" type="radio" 
+                                                   name="quiz-{{ quiz.id }}-option" 
+                                                   value="{{ option }}">
+                                            <label class="form-check-label">{{ option }}</label>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <button class="btn btn-sm btn-primary mt-2 check-answer" 
+                                        data-quiz-id="{{ quiz.id }}"
+                                        data-correct='{{ quiz.answer_text.correct|tojson }}'>
+                                    Check Answer
+                                </button>
+                                <div class="feedback mt-2" style="display: none;"></div>
+                            {% else %}
+                                {% if quiz.quiz_type == 'text' %}
+                                    <div class="answer-input">
+                                        <input type="text" class="form-control" placeholder="Your answer">
+                                        <button class="btn btn-sm btn-primary mt-2 check-answer" 
+                                                data-quiz-id="{{ quiz.id }}"
+                                                data-correct="{{ quiz.answer_text }}">
+                                            Check Answer
+                                        </button>
+                                        <div class="feedback mt-2" style="display: none;"></div>
+                                    </div>
+                                {% elif quiz.quiz_type == 'true_false' %}
+                                    <div class="true-false-options">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" 
+                                                   name="quiz-{{ quiz.id }}-option" 
+                                                   value="true"
+                                                   id="true-{{ quiz.id }}">
+                                            <label class="form-check-label" for="true-{{ quiz.id }}">True</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" 
+                                                   name="quiz-{{ quiz.id }}-option" 
+                                                   value="false"
+                                                   id="false-{{ quiz.id }}">
+                                            <label class="form-check-label" for="false-{{ quiz.id }}">False</label>
+                                        </div>
+                                        <button class="btn btn-sm btn-primary mt-2 check-answer" 
+                                                data-quiz-id="{{ quiz.id }}"
+                                                data-correct="{{ quiz.answer_text }}">
+                                            Check Answer
+                                        </button>
+                                        <div class="feedback mt-2" style="display: none;"></div>
+                                    </div>
+                                {% endif %}
+                            {% endif %}
+                            <small class="text-muted">Theme: {{ quiz.theme_name or 'None' }}</small>
                         </div>
                         {% endfor %}
-                    </div>
-                {% else %}
-                    <p class="text-center">No quizzes yet. <a href="/quiz/new">Create your first quiz!</a></p>
-                {% endif %}
+                    {% else %}
+                        <p class="text-center">No quizzes yet. <a href="{{ url_for('new_quiz') }}">Create your first quiz!</a></p>
+                    {% endif %}
+                </div>
             </div>
         </div>
-    </div>
-    
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h4>Default Quizzes</h4>
-            </div>
-            <div class="card-body">
-                {% if default_quizzes %}
-                    <div class="list-group">
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Default Quizzes</h5>
+                </div>
+                <div class="card-body">
+                    {% if default_quizzes %}
                         {% for quiz in default_quizzes %}
-                        <div class="list-group-item">
-                            <h5 class="mb-1">{{ quiz.question_text }}</h5>
-                            <p class="mb-1">{{ quiz.answer_text }}</p>
-                            <small class="text-muted">Created by Admin</small>
+                        <div class="quiz-item mb-3" id="quiz-{{ quiz.id }}">
+                            <h6>{{ quiz.question_text }}</h6>
+                            {% if quiz.quiz_type == 'multiple_choice' %}
+                                <div class="options">
+                                    {% for option in quiz.answer_text.options %}
+                                        <div class="form-check">
+                                            <input class="form-check-input quiz-option" type="radio" 
+                                                   name="quiz-{{ quiz.id }}-option" 
+                                                   value="{{ option }}">
+                                            <label class="form-check-label">{{ option }}</label>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <button class="btn btn-sm btn-primary mt-2 check-answer" 
+                                        data-quiz-id="{{ quiz.id }}"
+                                        data-correct='{{ quiz.answer_text.correct|tojson }}'>
+                                    Check Answer
+                                </button>
+                                <div class="feedback mt-2" style="display: none;"></div>
+                            {% else %}
+                                {% if quiz.quiz_type == 'text' %}
+                                    <div class="answer-input">
+                                        <input type="text" class="form-control" placeholder="Your answer">
+                                        <button class="btn btn-sm btn-primary mt-2 check-answer" 
+                                                data-quiz-id="{{ quiz.id }}"
+                                                data-correct="{{ quiz.answer_text }}">
+                                            Check Answer
+                                        </button>
+                                        <div class="feedback mt-2" style="display: none;"></div>
+                                    </div>
+                                {% elif quiz.quiz_type == 'true_false' %}
+                                    <div class="true-false-options">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" 
+                                                   name="quiz-{{ quiz.id }}-option" 
+                                                   value="true"
+                                                   id="true-{{ quiz.id }}">
+                                            <label class="form-check-label" for="true-{{ quiz.id }}">True</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" 
+                                                   name="quiz-{{ quiz.id }}-option" 
+                                                   value="false"
+                                                   id="false-{{ quiz.id }}">
+                                            <label class="form-check-label" for="false-{{ quiz.id }}">False</label>
+                                        </div>
+                                        <button class="btn btn-sm btn-primary mt-2 check-answer" 
+                                                data-quiz-id="{{ quiz.id }}"
+                                                data-correct="{{ quiz.answer_text }}">
+                                            Check Answer
+                                        </button>
+                                        <div class="feedback mt-2" style="display: none;"></div>
+                                    </div>
+                                {% endif %}
+                            {% endif %}
+                            <small class="text-muted">Created by {{ quiz.created_by or 'Admin' }}</small>
+                            <br>
+                            <small class="text-muted">Theme: {{ quiz.theme_name or 'None' }}</small>
                         </div>
                         {% endfor %}
-                    </div>
-                {% else %}
-                    <p class="text-center">No default quizzes available.</p>
-                {% endif %}
+                    {% else %}
+                        <p class="text-center">No default quizzes available.</p>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+.quiz-item {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 1rem;
+}
+.quiz-item:last-child {
+    border-bottom: none;
+}
+.options {
+    margin-left: 1rem;
+    margin-top: 0.5rem;
+}
+.answer {
+    margin-left: 1rem;
+    color: #666;
+}
+.feedback {
+    padding: 0.5rem;
+    border-radius: 4px;
+}
+.feedback.correct {
+    background-color: #d4edda;
+    color: #155724;
+}
+.feedback.incorrect {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.check-answer').forEach(button => {
+        button.addEventListener('click', function() {
+            const quizId = this.dataset.quizId;
+            const quizContainer = document.getElementById(`quiz-${quizId}`);
+            const feedbackDiv = quizContainer.querySelector('.feedback');
+            
+            let isCorrect = false;
+            let message = '';
+            
+            if (this.dataset.correct.startsWith('[')) {
+                // Multiple choice quiz
+                const correctAnswers = JSON.parse(this.dataset.correct);
+                const selectedOption = quizContainer.querySelector('input[type="radio"]:checked');
+                
+                if (!selectedOption) {
+                    message = 'Please select an answer.';
+                } else {
+                    isCorrect = correctAnswers.includes(selectedOption.value);
+                    message = isCorrect ? 'Correct!' : `Incorrect. The correct answer is: ${correctAnswers.join(' or ')}`;
+                }
+            } else {
+                // Text or True/False quiz
+                const quizType = quizContainer.querySelector('.true-false-options') ? 'true_false' : 'text';
+                
+                if (quizType === 'true_false') {
+                    const selectedOption = quizContainer.querySelector('input[type="radio"]:checked');
+                    if (!selectedOption) {
+                        message = 'Please select an answer.';
+                    } else {
+                        const correctAnswer = this.dataset.correct.toLowerCase();
+                        isCorrect = selectedOption.value.toLowerCase() === correctAnswer;
+                        message = isCorrect ? 'Correct!' : `Incorrect. The correct answer is: ${correctAnswer}`;
+                    }
+                } else {
+                    // Text answer quiz
+                    const userAnswer = quizContainer.querySelector('input[type="text"]').value.trim().toLowerCase();
+                    const correctAnswer = this.dataset.correct.toLowerCase();
+                    
+                    if (!userAnswer) {
+                        message = 'Please enter an answer.';
+                    } else {
+                        isCorrect = userAnswer === correctAnswer;
+                        message = isCorrect ? 'Correct!' : `Incorrect. The correct answer is: ${this.dataset.correct}`;
+                    }
+                }
+            }
+            
+            feedbackDiv.textContent = message;
+            feedbackDiv.className = `feedback mt-2 ${isCorrect ? 'correct' : 'incorrect'}`;
+            feedbackDiv.style.display = 'block';
+        });
+    });
+});
+</script>
 {% endblock %} 

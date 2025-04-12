@@ -87,27 +87,36 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """Register a new user"""
-    if request.method == 'POST':
-        try:
-            data = request.get_json()
-            logger.debug(f"Registration attempt with data: {data}")
+    if request.method == 'GET':
+        return render_template('register.html')
+        
+    try:
+        data = request.get_json()
+        logger.debug(f"Registration attempt with data: {data}")
+        
+        # Forward the registration request to the backend
+        response = requests.post(
+            f'{BACKEND_URL}/register',
+            json=data
+        )
+        
+        logger.debug(f"Backend registration response: {response.status_code}")
+        logger.debug(f"Backend registration response content: {response.text}")
+        
+        if response.status_code == 201:
+            # Registration successful
+            return jsonify({
+                'message': 'Registration successful',
+                'api_key': response.json().get('api_key')
+            }), 201
             
-            response = requests.post(f'{BACKEND_URL}/register', json=data)
-            logger.debug(f"Backend registration response: {response.status_code}")
-            
-            if response.status_code == 201:
-                # Get the session cookie from the backend response
-                session_cookie = response.cookies.get('session')
-                if session_cookie:
-                    session['user_id'] = session_cookie
-                    logger.debug(f"User registered with session: {session_cookie}")
-                    return jsonify({'message': 'Registration successful'}), 201
-            logger.error(f"Registration failed with response: {response.text}")
-            return jsonify({'error': 'Registration failed'}), 400
-        except Exception as e:
-            logger.error("Registration error", exc_info=True)
-            return jsonify({'error': str(e)}), 500
-    return render_template('register.html')
+        # Handle error cases
+        error_data = response.json()
+        return jsonify({'error': error_data.get('error', 'Registration failed')}), response.status_code
+        
+    except Exception as e:
+        logger.error(f"Registration error: {str(e)}")
+        return jsonify({'error': 'An error occurred during registration'}), 500
 
 @app.route('/dashboard')
 def dashboard():
@@ -129,14 +138,14 @@ def dashboard():
         
         # Get user's quizzes
         quizzes_response = requests.get(
-            f'{BACKEND_URL}/quiz/mine',
+            f'{BACKEND_URL}/quizzes',  # Updated endpoint
             headers={'x-api-key': api_key},
             cookies={'session': session.get('user_id')}
         )
         quizzes = quizzes_response.json() if quizzes_response.status_code == 200 else []
         
         # Get default quizzes
-        default_response = requests.get(f'{BACKEND_URL}/quiz/default')
+        default_response = requests.get(f'{BACKEND_URL}/quizzes/default')
         default_quizzes = default_response.json() if default_response.status_code == 200 else []
         
         return render_template('dashboard.html', quizzes=quizzes, default_quizzes=default_quizzes)
@@ -169,39 +178,44 @@ def new_quiz():
             api_key = api_key_response.json()['api_key']
             
             # Create quiz
-            quiz_data = {
-                'question_text': request.form['question_text'],
-                'answer_text': request.form['answer_text'],
-                'theme_id': request.form.get('theme_id') or None
-            }
+            quiz_data = request.get_json()  # Get JSON data instead of form data
             
             response = requests.post(
-                f'{BACKEND_URL}/quiz',
+                f'{BACKEND_URL}/quizzes',  # Updated endpoint
                 json=quiz_data,
-                headers={'x-api-key': api_key},
+                headers={
+                    'x-api-key': api_key,
+                    'Content-Type': 'application/json'
+                },
                 cookies={'session': session.get('user_id')}
             )
             
             if response.status_code == 201:
                 return redirect(url_for('dashboard'))
-            logger.error(f"Failed to create quiz: {response.text}")
-            return render_template('new_quiz.html', error='Failed to create quiz')
+            
+            error_msg = response.json().get('error', 'Failed to create quiz')
+            logger.error(f"Failed to create quiz: {error_msg}")
+            return jsonify({'error': error_msg}), response.status_code
+            
         except Exception as e:
             logger.error("Error creating quiz", exc_info=True)
-            return render_template('new_quiz.html', error=str(e))
+            return jsonify({'error': str(e)}), 500
     
     # GET request - show form
     try:
         # Get themes
-        themes_response = requests.get(
-            f'{BACKEND_URL}/themes'
-        )
+        logger.info("Fetching themes from backend...")
+        themes_response = requests.get(f'{BACKEND_URL}/themes')
+        logger.info(f"Themes response status: {themes_response.status_code}")
+        logger.info(f"Themes response content: {themes_response.text}")
+        
         if themes_response.status_code == 200:
-            themes = themes_response.json().get('themes', [])
+            themes = themes_response.json()  # Themes array is returned directly now
+            logger.info(f"Retrieved themes: {themes}")
+            return render_template('new_quiz.html', themes=themes)
         else:
-            themes = []
             logger.error(f"Failed to get themes: {themes_response.text}")
-        return render_template('new_quiz.html', themes=themes)
+            return render_template('new_quiz.html', themes=[], error='Failed to load themes')
     except Exception as e:
         logger.error("Error getting themes", exc_info=True)
         return render_template('new_quiz.html', themes=[], error=str(e))

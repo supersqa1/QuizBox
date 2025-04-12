@@ -14,15 +14,72 @@
                 <div class="alert alert-danger">{{ error }}</div>
                 {% endif %}
                 
-                <form method="POST">
+                <form id="quizForm">
+                    <div class="mb-3">
+                        <label for="quiz_type" class="form-label">Quiz Type</label>
+                        <select class="form-select" id="quiz_type" name="quiz_type" required>
+                            <option value="">Select a quiz type</option>
+                            <option value="textAnswer">Text Answer</option>
+                            <option value="multipleChoice">Multiple Choice</option>
+                            <option value="fillBlank">Fill in the Blank</option>
+                            <option value="trueFalse">True/False</option>
+                        </select>
+                    </div>
+
                     <div class="mb-3">
                         <label for="question_text" class="form-label">Question</label>
                         <textarea class="form-control" id="question_text" name="question_text" rows="3" required></textarea>
                     </div>
-                    <div class="mb-3">
-                        <label for="answer_text" class="form-label">Answer</label>
-                        <textarea class="form-control" id="answer_text" name="answer_text" rows="3" required></textarea>
+
+                    <!-- Text Answer Section -->
+                    <div id="textAnswerSection" class="quiz-section" style="display: none;">
+                        <div class="mb-3">
+                            <label for="answer_text" class="form-label">Answer</label>
+                            <textarea class="form-control" id="answer_text" name="answer_text" rows="3" required></textarea>
+                        </div>
                     </div>
+
+                    <!-- Multiple Choice Section -->
+                    <div id="multipleChoiceSection" class="quiz-section" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label">Options</label>
+                            <div id="optionsContainer">
+                                <div class="input-group mb-2">
+                                    <input type="text" class="form-control" name="options[]" placeholder="Option text" required>
+                                    <div class="input-group-text">
+                                        <input class="form-check-input" type="checkbox" name="correct_options[]" value="0">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="addOption">
+                                <i class="bi bi-plus"></i> Add Option
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Fill in the Blank Section -->
+                    <div id="fillBlankSection" class="quiz-section" style="display: none;">
+                        <div class="mb-3">
+                            <label for="fill_blank_answer" class="form-label">Correct Answer</label>
+                            <input type="text" class="form-control" id="fill_blank_answer" name="fill_blank_answer" required>
+                        </div>
+                    </div>
+
+                    <!-- True/False Section -->
+                    <div id="trueFalseSection" class="quiz-section" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label">Correct Answer</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="true_false_answer" value="true" id="trueOption" required>
+                                <label class="form-check-label" for="trueOption">True</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="true_false_answer" value="false" id="falseOption">
+                                <label class="form-check-label" for="falseOption">False</label>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label for="theme_id" class="form-label">Theme (optional)</label>
                         <select class="form-select" id="theme_id" name="theme_id">
@@ -32,8 +89,9 @@
                             {% endfor %}
                         </select>
                     </div>
+
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary">Create Quiz</button>
+                        <button type="submit" class="btn btn-primary" id="submitButton">Create Quiz</button>
                         <a href="/dashboard" class="btn btn-secondary">Cancel</a>
                     </div>
                 </form>
@@ -41,4 +99,162 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const quizTypeSelect = document.getElementById('quiz_type');
+    const quizSections = document.querySelectorAll('.quiz-section');
+    const optionsContainer = document.getElementById('optionsContainer');
+    const addOptionButton = document.getElementById('addOption');
+    const quizForm = document.getElementById('quizForm');
+    const submitButton = document.getElementById('submitButton');
+    let optionCount = 1;
+
+    // Show/hide quiz sections based on type
+    quizTypeSelect.addEventListener('change', function() {
+        const selectedType = this.value;
+        console.log('Selected type:', selectedType);
+        
+        // Hide all sections first
+        quizSections.forEach(section => section.style.display = 'none');
+        
+        // Show the selected section
+        const selectedSection = document.getElementById(selectedType + 'Section');
+        console.log('Selected section:', selectedSection);
+        
+        if (selectedSection) {
+            selectedSection.style.display = 'block';
+        }
+    });
+
+    // Add new option for multiple choice
+    addOptionButton && addOptionButton.addEventListener('click', function() {
+        const newOption = document.createElement('div');
+        newOption.className = 'input-group mb-2';
+        newOption.innerHTML = `
+            <input type="text" class="form-control" name="options[]" placeholder="Option text" required>
+            <div class="input-group-text">
+                <input class="form-check-input" type="checkbox" name="correct_options[]" value="${optionCount}">
+            </div>
+        `;
+        optionsContainer.appendChild(newOption);
+        optionCount++;
+    });
+
+    // Form submission handling
+    function handleSubmit(e) {
+        e.preventDefault();
+        console.log('Form submission triggered');
+        
+        try {
+            const formData = new FormData(quizForm);
+            const quizType = formData.get('quiz_type');
+            console.log('Quiz type:', quizType);
+            
+            const quizData = {
+                quiz_type: quizType === 'multipleChoice' ? 'multiple_choice' : 
+                          quizType === 'trueFalse' ? 'true_false' : 'text',
+                question_text: formData.get('question_text'),
+                theme_id: formData.get('theme_id') || null
+            };
+
+            // Handle different quiz types
+            switch(quizType) {
+                case 'textAnswer':
+                    quizData.answer_text = formData.get('answer_text');
+                    break;
+                case 'multipleChoice':
+                    const options = Array.from(formData.getAll('options[]')).filter(opt => opt.trim());
+                    const correctIndices = formData.getAll('correct_options[]');
+                    
+                    if (options.length === 0) {
+                        throw new Error('Please add at least one option');
+                    }
+                    if (correctIndices.length === 0) {
+                        throw new Error('Please select at least one correct answer');
+                    }
+                    
+                    const correctOptions = correctIndices.map(i => options[parseInt(i)]).filter(Boolean);
+                    if (correctOptions.length === 0) {
+                        throw new Error('Invalid correct answer selection');
+                    }
+                    
+                    quizData.answer_text = {
+                        options: options,
+                        correct: correctOptions
+                    };
+                    break;
+                case 'fillBlank':
+                    quizData.quiz_type = 'text';
+                    quizData.answer_text = formData.get('fill_blank_answer');
+                    if (!quizData.answer_text) {
+                        throw new Error('Please enter a correct answer');
+                    }
+                    break;
+                case 'trueFalse':
+                    quizData.answer_text = formData.get('true_false_answer');
+                    if (!quizData.answer_text) {
+                        throw new Error('Please select true or false');
+                    }
+                    break;
+                default:
+                    throw new Error('Please select a quiz type');
+            }
+
+            console.log('Submitting quiz data:', quizData);
+
+            // Submit the form data
+            fetch('/quiz/new', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(quizData)
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.href = '/dashboard';
+                    return;
+                }
+                return response.text().then(text => {
+                    try {
+                        const data = JSON.parse(text);
+                        throw new Error(data.error || 'Failed to create quiz');
+                    } catch (e) {
+                        throw new Error(text || 'Failed to create quiz');
+                    }
+                });
+            })
+            .catch(error => {
+                const errorDiv = document.querySelector('.alert-danger') || document.createElement('div');
+                errorDiv.className = 'alert alert-danger';
+                errorDiv.textContent = error.message;
+                const cardBody = document.querySelector('.card-body');
+                const form = document.querySelector('form');
+                if (!errorDiv.parentNode) {
+                    cardBody.insertBefore(errorDiv, form);
+                }
+            });
+        } catch (error) {
+            const errorDiv = document.querySelector('.alert-danger') || document.createElement('div');
+            errorDiv.className = 'alert alert-danger';
+            errorDiv.textContent = error.message;
+            const cardBody = document.querySelector('.card-body');
+            const form = document.querySelector('form');
+            if (!errorDiv.parentNode) {
+                cardBody.insertBefore(errorDiv, form);
+            }
+        }
+    }
+
+    // Add both submit button click and form submit handlers
+    quizForm.addEventListener('submit', handleSubmit);
+    submitButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        handleSubmit(e);
+    });
+});
+</script>
 {% endblock %} 

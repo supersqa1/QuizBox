@@ -161,31 +161,49 @@ def register():
     db = get_db()
     try:
         with db.cursor() as cursor:
-            # Check if email already exists
-            cursor.execute("SELECT id FROM users WHERE email = %s", (data['email'],))
-            if cursor.fetchone():
-                return jsonify({'error': 'Email already registered'}), 400
+            # Start transaction
+            db.begin()
             
-            # Create user
-            password_hash = generate_password_hash(data['password'])
-            cursor.execute(
-                "INSERT INTO users (name, email, password_hash) VALUES (%s, %s, %s)",
-                (data['name'], data['email'], password_hash)
-            )
-            user_id = cursor.lastrowid
-            
-            # Generate API key
-            api_key = secrets.token_urlsafe(32)
-            cursor.execute(
-                "INSERT INTO api_keys (user_id, api_key) VALUES (%s, %s)",
-                (user_id, api_key)
-            )
-            
-            db.commit()
-            return jsonify({
-                'message': 'User registered successfully',
-                'api_key': api_key
-            }), 201
+            try:
+                # Create user
+                password_hash = generate_password_hash(data['password'])
+                cursor.execute(
+                    "INSERT INTO users (name, email, password_hash) VALUES (%s, %s, %s)",
+                    (data['name'], data['email'], password_hash)
+                )
+                user_id = cursor.lastrowid
+                
+                # Generate API key
+                api_key = secrets.token_urlsafe(32)
+                cursor.execute(
+                    "INSERT INTO api_keys (user_id, api_key) VALUES (%s, %s)",
+                    (user_id, api_key)
+                )
+                
+                # Commit transaction
+                db.commit()
+                
+                # Set session
+                session['user_id'] = user_id
+                
+                return jsonify({
+                    'message': 'User registered successfully',
+                    'api_key': api_key
+                }), 201
+                
+            except pymysql.err.IntegrityError as e:
+                db.rollback()
+                if e.args[0] == 1062:  # MySQL duplicate entry error code
+                    return jsonify({'error': 'Email already registered'}), 400
+                raise
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error during registration: {str(e)}")
+                return jsonify({'error': 'Registration failed'}), 500
+                
+    except Exception as e:
+        logger.error(f"Database error during registration: {str(e)}")
+        return jsonify({'error': 'Registration failed'}), 500
     finally:
         db.close()
 
@@ -287,8 +305,15 @@ def refresh_api_key():
 
 @app.route('/health')
 def health_check():
-    """Health check endpoint for Docker"""
-    return jsonify({"status": "healthy"}), 200
+    """Health check endpoint"""
+    try:
+        # Try to connect to the database
+        db = get_db()
+        db.close()
+        return jsonify({'status': 'healthy'}), 200
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
 
 @app.route('/themes', methods=['GET'])
 def get_themes():
@@ -296,60 +321,64 @@ def get_themes():
     db = get_db()
     try:
         with db.cursor() as cursor:
-            cursor.execute("SELECT id, name, description FROM themes")
+            cursor.execute("SELECT id, name FROM themes")
             themes = cursor.fetchall()
             logger.debug(f"Found {len(themes)} themes: {themes}")
-            return jsonify({'themes': themes})
+            return jsonify(themes)  # Return themes array directly
     except Exception as e:
         logger.error("Error fetching themes", exc_info=True)
         return jsonify({'error': 'Failed to fetch themes'}), 500
     finally:
         db.close()
 
-@app.route('/quiz', methods=['POST'])
-@require_api_key
+@app.route('/quizzes', methods=['POST'])
+@require_login
 def create_quiz():
-    """Create a new quiz"""
-    data = request.get_json()
-    logger.debug(f"Creating quiz with data: {data}")
-    
-    if not all(k in data for k in ('question_text', 'answer_text')):
-        logger.error("Missing required fields in quiz data")
-        return jsonify({'error': 'Missing required fields'}), 400
-    
     db = get_db()
     try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
+        required_fields = ['quiz_type', 'question_text', 'answer_text', 'theme_id']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+                
+        # Validate quiz type
+        if data['quiz_type'] not in ['text', 'multiple_choice', 'true_false']:
+            return jsonify({'error': 'Invalid quiz type'}), 400
+            
+        # For multiple choice quizzes, validate answer_text format
+        if data['quiz_type'] == 'multiple_choice':
+            try:
+                if not isinstance(data['answer_text'], dict):
+                    return jsonify({'error': 'Answer text must be a JSON object for multiple choice quizzes'}), 400
+                if 'options' not in data['answer_text'] or 'correct' not in data['answer_text']:
+                    return jsonify({'error': 'Answer text must contain options and correct fields for multiple choice quizzes'}), 400
+                data['answer_text'] = json.dumps(data['answer_text'])
+            except json.JSONDecodeError:
+                return jsonify({'error': 'Invalid JSON format for answer text'}), 400
+                
         with db.cursor() as cursor:
-            # Create quiz
             cursor.execute(
-                """INSERT INTO quizzes (user_id, question_text, answer_text, structure, theme_id) 
+                """INSERT INTO quizzes (user_id, quiz_type, question_text, answer_text, theme_id) 
                    VALUES (%s, %s, %s, %s, %s)""",
-                (request.user_id, 
-                 data['question_text'], 
-                 data['answer_text'],
-                 json.dumps(data.get('structure')) if data.get('structure') else None,
-                 data.get('theme_id'))
+                (request.user_id, data['quiz_type'], data['question_text'], 
+                 data['answer_text'], data['theme_id'])
             )
             quiz_id = cursor.lastrowid
-            logger.debug(f"Created quiz with ID: {quiz_id}")
-            
             db.commit()
-            logger.info(f"Quiz created successfully with ID: {quiz_id}")
             
-            # Return the created quiz data
-            response_data = {
-                'id': quiz_id,
-                'question_text': data['question_text'],
-                'answer_text': data['answer_text'],
-                'structure': data.get('structure'),
-                'theme_id': data.get('theme_id'),
-                'message': 'Quiz created successfully'
-            }
-            return jsonify(response_data), 201
+            return jsonify({
+                'message': 'Quiz created successfully',
+                'id': quiz_id
+            }), 201
+        
     except Exception as e:
-        logger.error("Error during quiz creation", exc_info=True)
         db.rollback()
-        return jsonify({'error': f'Failed to create quiz: {str(e)}'}), 500
+        app.logger.error(f"Error creating quiz: {str(e)}")
+        return jsonify({'error': 'Failed to create quiz'}), 500
     finally:
         db.close()
 
@@ -372,48 +401,64 @@ def get_my_quizzes():
     finally:
         db.close()
 
-@app.route('/quiz/default', methods=['GET'])
+@app.route('/quizzes/default', methods=['GET'])
 def get_default_quizzes():
     """Get all quizzes created by admin users"""
     db = get_db()
     try:
         with db.cursor() as cursor:
             cursor.execute(
-                """SELECT q.id, q.question_text, q.answer_text, q.structure, q.theme_id, t.name as theme_name
+                """SELECT q.id, q.quiz_type, q.question_text, q.answer_text, q.theme_id, t.name as theme_name, u.name as created_by
                    FROM quizzes q
                    LEFT JOIN themes t ON q.theme_id = t.id
                    JOIN users u ON q.user_id = u.id
                    WHERE u.is_admin = TRUE"""
             )
             quizzes = cursor.fetchall()
+            
+            # For multiple choice quizzes, parse the answer_text as JSON
+            for quiz in quizzes:
+                if quiz['quiz_type'] == 'multiple_choice':
+                    try:
+                        quiz['answer_text'] = json.loads(quiz['answer_text'])
+                    except (json.JSONDecodeError, TypeError):
+                        # If JSON parsing fails, leave as is
+                        pass
+            
             return jsonify(quizzes)
     finally:
         db.close()
 
-@app.route('/quiz/<int:quiz_id>', methods=['GET'])
+@app.route('/quizzes', methods=['GET'])
 @require_login
-def get_quiz(quiz_id):
-    """Get a specific quiz"""
-    db = get_db()
+def get_quizzes():
     try:
+        db = get_db()
         with db.cursor() as cursor:
             cursor.execute(
-                """SELECT q.*, t.name as theme_name 
+                """SELECT q.id, q.user_id, q.quiz_type, q.question_text, q.answer_text, q.theme_id, 
+                          t.name as theme_name, q.created_at 
                    FROM quizzes q
                    LEFT JOIN themes t ON q.theme_id = t.id
-                   WHERE q.id = %s""",
-                (quiz_id,)
+                   WHERE q.user_id = %s""",
+                (request.user_id,)
             )
-            quiz = cursor.fetchone()
+            quizzes = cursor.fetchall()
             
-            if not quiz:
-                return jsonify({'error': 'Quiz not found'}), 404
-                
-            # Parse structure JSON if it exists
-            if quiz['structure']:
-                quiz['structure'] = json.loads(quiz['structure'])
-                
-            return jsonify(quiz)
+            # For multiple choice quizzes, parse the answer_text as JSON
+            for quiz in quizzes:
+                if quiz['quiz_type'] == 'multiple_choice':
+                    try:
+                        quiz['answer_text'] = json.loads(quiz['answer_text'])
+                    except (json.JSONDecodeError, TypeError):
+                        # If JSON parsing fails, leave as is
+                        pass
+                    
+            return jsonify(quizzes), 200
+            
+    except Exception as e:
+        app.logger.error(f"Error retrieving quizzes: {str(e)}")
+        return jsonify({'error': 'Failed to retrieve quizzes'}), 500
     finally:
         db.close()
 

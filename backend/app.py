@@ -161,31 +161,49 @@ def register():
     db = get_db()
     try:
         with db.cursor() as cursor:
-            # Check if email already exists
-            cursor.execute("SELECT id FROM users WHERE email = %s", (data['email'],))
-            if cursor.fetchone():
-                return jsonify({'error': 'Email already registered'}), 400
+            # Start transaction
+            db.begin()
             
-            # Create user
-            password_hash = generate_password_hash(data['password'])
-            cursor.execute(
-                "INSERT INTO users (name, email, password_hash) VALUES (%s, %s, %s)",
-                (data['name'], data['email'], password_hash)
-            )
-            user_id = cursor.lastrowid
-            
-            # Generate API key
-            api_key = secrets.token_urlsafe(32)
-            cursor.execute(
-                "INSERT INTO api_keys (user_id, api_key) VALUES (%s, %s)",
-                (user_id, api_key)
-            )
-            
-            db.commit()
-            return jsonify({
-                'message': 'User registered successfully',
-                'api_key': api_key
-            }), 201
+            try:
+                # Create user
+                password_hash = generate_password_hash(data['password'])
+                cursor.execute(
+                    "INSERT INTO users (name, email, password_hash) VALUES (%s, %s, %s)",
+                    (data['name'], data['email'], password_hash)
+                )
+                user_id = cursor.lastrowid
+                
+                # Generate API key
+                api_key = secrets.token_urlsafe(32)
+                cursor.execute(
+                    "INSERT INTO api_keys (user_id, api_key) VALUES (%s, %s)",
+                    (user_id, api_key)
+                )
+                
+                # Commit transaction
+                db.commit()
+                
+                # Set session
+                session['user_id'] = user_id
+                
+                return jsonify({
+                    'message': 'User registered successfully',
+                    'api_key': api_key
+                }), 201
+                
+            except pymysql.err.IntegrityError as e:
+                db.rollback()
+                if e.args[0] == 1062:  # MySQL duplicate entry error code
+                    return jsonify({'error': 'Email already registered'}), 400
+                raise
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error during registration: {str(e)}")
+                return jsonify({'error': 'Registration failed'}), 500
+                
+    except Exception as e:
+        logger.error(f"Database error during registration: {str(e)}")
+        return jsonify({'error': 'Registration failed'}), 500
     finally:
         db.close()
 

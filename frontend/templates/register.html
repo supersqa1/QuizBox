@@ -45,6 +45,12 @@
         const errorMessage = document.getElementById('error-message');
         errorMessage.classList.add('d-none');
         
+        // Disable the submit button to prevent double submission
+        const submitButton = e.target.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.textContent;
+        submitButton.disabled = true;
+        submitButton.textContent = 'Registering...';
+        
         const formData = {
             name: document.getElementById('name').value,
             email: document.getElementById('email').value,
@@ -62,15 +68,24 @@
             
             const data = await response.json();
             
-            if (response.ok) {
+            if (response.status === 201) {
+                // Successful registration, redirect to dashboard
                 window.location.href = '/dashboard';
-            } else {
-                errorMessage.textContent = data.error || 'Registration failed';
-                errorMessage.classList.remove('d-none');
+                return;
             }
+            
+            // Handle error cases
+            errorMessage.textContent = data.error || 'Registration failed';
+            errorMessage.classList.remove('d-none');
+            submitButton.disabled = false;
+            submitButton.textContent = originalButtonText;
+            
         } catch (error) {
+            console.error('Registration error:', error);
             errorMessage.textContent = 'An error occurred during registration';
             errorMessage.classList.remove('d-none');
+            submitButton.disabled = false;
+            submitButton.textContent = originalButtonText;
         }
     });
 </script>

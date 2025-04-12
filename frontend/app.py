@@ -87,39 +87,36 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """Register a new user"""
-    if request.method == 'POST':
-        try:
-            data = request.get_json()
-            logger.debug(f"Registration attempt with data: {data}")
+    if request.method == 'GET':
+        return render_template('register.html')
+        
+    try:
+        data = request.get_json()
+        logger.debug(f"Registration attempt with data: {data}")
+        
+        # Forward the registration request to the backend
+        response = requests.post(
+            f'{BACKEND_URL}/register',
+            json=data
+        )
+        
+        logger.debug(f"Backend registration response: {response.status_code}")
+        logger.debug(f"Backend registration response content: {response.text}")
+        
+        if response.status_code == 201:
+            # Registration successful
+            return jsonify({
+                'message': 'Registration successful',
+                'api_key': response.json().get('api_key')
+            }), 201
             
-            response = requests.post(f'{BACKEND_URL}/register', json=data)
-            logger.debug(f"Backend registration response: {response.status_code}")
-            
-            if response.status_code == 201:
-                # Get the session cookie from the backend response
-                session_cookie = response.cookies.get('session')
-                if session_cookie:
-                    session['user_id'] = session_cookie
-                    logger.debug(f"User registered with session: {session_cookie}")
-                    return jsonify({'message': 'Registration successful'}), 201
-                else:
-                    # If no session cookie, try to login to get one
-                    login_response = requests.post(f'{BACKEND_URL}/login', json={
-                        'email': data['email'],
-                        'password': data['password']
-                    })
-                    if login_response.status_code == 200:
-                        session_cookie = login_response.cookies.get('session')
-                        if session_cookie:
-                            session['user_id'] = session_cookie
-                            return jsonify({'message': 'Registration successful'}), 201
-            logger.error(f"Registration failed with response: {response.text}")
-            error_data = response.json()
-            return jsonify({'error': error_data.get('error', 'Registration failed')}), response.status_code
-        except Exception as e:
-            logger.error("Registration error", exc_info=True)
-            return jsonify({'error': str(e)}), 500
-    return render_template('register.html')
+        # Handle error cases
+        error_data = response.json()
+        return jsonify({'error': error_data.get('error', 'Registration failed')}), response.status_code
+        
+    except Exception as e:
+        logger.error(f"Registration error: {str(e)}")
+        return jsonify({'error': 'An error occurred during registration'}), 500
 
 @app.route('/dashboard')
 def dashboard():

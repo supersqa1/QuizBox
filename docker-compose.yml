@@ -1,0 +1,62 @@
+services:
+  mysql:
+    container_name: quizbox-mysql
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: quizbox
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    networks:
+      - quizbox-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      start_period: 30s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    container_name: quizbox-backend
+    build: ./backend
+    ports:
+      - "5050:5050"
+    environment:
+      - DB_HOST=mysql
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DB_NAME=quizbox
+      - SECRET_KEY=your-secret-key-here
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    networks:
+      - quizbox-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5050/health"]
+      start_period: 30s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    container_name: quizbox-frontend
+    build: ./frontend
+    ports:
+      - "5151:5151"
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - quizbox-network
+
+networks:
+  quizbox-network:
+    driver: bridge
+
+volumes:
+  mysql_data: 

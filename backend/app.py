@@ -462,6 +462,37 @@ def get_quizzes():
     finally:
         db.close()
 
+@app.route('/quizzes/<int:quiz_id>', methods=['GET'])
+@require_login
+def get_quiz(quiz_id):
+    """Get a specific quiz"""
+    db = get_db()
+    try:
+        with db.cursor() as cursor:
+            cursor.execute(
+                """SELECT q.*, t.name as theme_name
+                   FROM quizzes q
+                   LEFT JOIN themes t ON q.theme_id = t.id
+                   WHERE q.id = %s""",
+                (quiz_id,)
+            )
+            quiz = cursor.fetchone()
+            
+            if not quiz:
+                return jsonify({'error': 'Quiz not found'}), 404
+                
+            # For multiple choice quizzes, parse the answer_text as JSON
+            if quiz['quiz_type'] == 'multiple_choice':
+                try:
+                    quiz['answer_text'] = json.loads(quiz['answer_text'])
+                except (json.JSONDecodeError, TypeError):
+                    # If JSON parsing fails, leave as is
+                    pass
+                    
+            return jsonify(quiz)
+    finally:
+        db.close()
+
 @app.route('/themes/<int:theme_id>/quiz', methods=['GET'])
 @require_login
 def get_theme_quizzes(theme_id):
@@ -484,10 +515,14 @@ def get_theme_quizzes(theme_id):
             )
             quizzes = cursor.fetchall()
             
-            # Parse structure JSON for each quiz
+            # For multiple choice quizzes, parse the answer_text as JSON
             for quiz in quizzes:
-                if quiz['structure']:
-                    quiz['structure'] = json.loads(quiz['structure'])
+                if quiz['quiz_type'] == 'multiple_choice':
+                    try:
+                        quiz['answer_text'] = json.loads(quiz['answer_text'])
+                    except (json.JSONDecodeError, TypeError):
+                        # If JSON parsing fails, leave as is
+                        pass
             
             return jsonify(quizzes)
     finally:

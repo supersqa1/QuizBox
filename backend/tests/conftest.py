@@ -92,9 +92,9 @@ def test_db():
                 CREATE TABLE IF NOT EXISTS quizzes (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     user_id INT NOT NULL,
+                    quiz_type VARCHAR(20) NOT NULL,
                     question_text TEXT NOT NULL,
                     answer_text TEXT NOT NULL,
-                    structure JSON,
                     theme_id INT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id),

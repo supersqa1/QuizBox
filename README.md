@@ -37,24 +37,42 @@ The application will be available at:
 
 ## API Documentation
 
-QuizBox provides comprehensive API documentation through Swagger UI. You can access it in two ways:
+### Accessing Swagger Documentation
+
+Once the application is running, you can access the API documentation in several ways:
 
 1. **Interactive Swagger UI**:
-   - Visit http://localhost:5151/api/
-   - This provides an interactive interface to explore and test all available endpoints
+   - Open your web browser
+   - Navigate to http://localhost:5151/api/
+   - You'll see a complete interactive documentation of all available endpoints
+   - You can:
+     - Browse all available endpoints
+     - See request/response schemas
+     - Try out the APIs directly from the browser
+     - View example requests and responses
 
-2. **OpenAPI Specification**:
+2. **OpenAPI Specification (Swagger JSON)**:
    - Access the raw OpenAPI specification at http://localhost:5151/api/swagger.json
-   - This can be imported into tools like Postman
+   - This JSON file contains the complete API specification
+   - You can use this to:
+     - Import into API tools like Postman
+     - Generate client libraries
+     - Use with other API documentation tools
 
 ### Importing to Postman
 
 To import the API specification into Postman:
 
 1. Open Postman
-2. Click "Import"
-3. Enter the URL: http://localhost:5151/api/swagger.json
-4. Click "Import"
+2. Click "Import" in the top-left corner
+3. Choose the "Link" tab
+4. Enter the URL: http://localhost:5151/api/swagger.json
+5. Click "Import"
+
+If you have trouble importing directly from the URL, you can:
+1. Open http://localhost:5151/api/swagger.json in your browser
+2. Save the JSON file to your computer
+3. In Postman, click "Import" and select the saved file
 
 ### Example API Endpoints
 

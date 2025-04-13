@@ -2,9 +2,13 @@ from flask import Flask, render_template, session, redirect, url_for, request, j
 import requests
 import os
 import logging
+from api_docs import api_bp
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev')
+
+# Register the API documentation blueprint
+app.register_blueprint(api_bp, url_prefix='/api')
 
 # Configure logging
 logging.basicConfig(
